@@ -8,9 +8,28 @@ export const MAX_ANSWER = 80;
 export const REGULAR_ROUNDS = 3;
 export const FINAL_ROUND = 4;
 
-export type GameId = 'comedy-clash';
+export type GameId = 'comedy-clash' | 'fib-factory' | 'doodle-duel' | 'who-dunnit';
+
+export interface GameMeta {
+  id: GameId;
+  name: string;
+  tag: string;
+  minPlayers: number;
+  maxPlayers: number;
+  time: string;
+  color: 'pink' | 'cyan' | 'lime' | 'orange';
+}
+
+export const GAME_LIST: GameMeta[] = [
+  { id: 'comedy-clash', name: 'Noor’s Whiplash', tag: 'Write terrible answers. Get judged by friends.', minPlayers: 3, maxPlayers: 10, time: '~20 min', color: 'pink' },
+  { id: 'fib-factory', name: 'Fib Factory', tag: 'Weird true facts. Fake answers. Fool your friends.', minPlayers: 3, maxPlayers: 10, time: '~15 min', color: 'orange' },
+  { id: 'doodle-duel', name: 'Doodle Duel', tag: 'Draw filthy things on your phone. Everyone guesses.', minPlayers: 3, maxPlayers: 10, time: '~15 min', color: 'cyan' },
+  { id: 'who-dunnit', name: 'Who Dunnit?', tag: 'One of you got a different question. Find the faker.', minPlayers: 4, maxPlayers: 10, time: '~15 min', color: 'lime' },
+];
+export const gameMeta = (id: GameId) => GAME_LIST.find((g) => g.id === id) ?? GAME_LIST[0];
 
 export type Phase =
+  | (string & {})
   | 'lobby'
   | 'intro'
   | 'roundIntro'
@@ -92,6 +111,8 @@ export interface HostView {
   phase: Phase;
   round: number; // 0 = lobby, 1..3 regular, 4 = final
   totalRounds: number;
+  minPlayers: number;
+  data?: any; // game-specific payload (non-Whiplash games)
   players: PublicPlayer[];
   settings: Settings;
   timer: TimerView | null;
@@ -122,6 +143,9 @@ export interface VoteOption {
 export interface PlayerView {
   role: 'player';
   code: string;
+  gameId: GameId;
+  minPlayers: number;
+  data?: any;
   phase: Phase;
   round: number;
   totalRounds: number;
@@ -149,7 +173,8 @@ export type GameView = HostView | PlayerView;
 
 export type PlayerAction =
   | { type: 'submit'; promptId: string; text: string }
-  | { type: 'vote'; choice: string };
+  | { type: 'vote'; choice: string }
+  | { type: string; [key: string]: any };
 
 export interface Ack<T = {}> {
   ok: boolean;

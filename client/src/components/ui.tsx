@@ -4,7 +4,7 @@ import { audioPrefs, audioReady, onAudioChange, setMuted, setMusicEnabled, setVo
 import { now } from '../net';
 import type { TimerView } from '../../../shared/types';
 
-export type Theme = 'menu' | 'r1' | 'r2' | 'r3' | 'final' | 'win';
+export type Theme = 'menu' | 'r1' | 'r2' | 'r3' | 'final' | 'win' | 'fib' | 'doodle' | 'who';
 
 export const themeForRound = (round: number): Theme => (round >= 4 ? 'final' : round === 3 ? 'r3' : round === 2 ? 'r2' : 'r1');
 

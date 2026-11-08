@@ -4,6 +4,14 @@ A real-time multiplayer party game you play the way TV game shows work: open it 
 
 Noor’s Whiplash is the first game on the platform. Players write answers to filthy, dark or just plain weird prompts, the answers go head-to-head anonymously, and everyone else votes for the funnier one.
 
+**Four games, one room.** Pick a game on the TV (you can switch in the lobby between games):
+- **Noor’s Whiplash**: write answers to prompts and win anonymous head-to-head votes.
+- **Fib Factory**: a weird TRUE fact has a blank. Write a convincing fake answer, then try to spot the truth. +1,000 for the truth, +500 for every friend you fool.
+- **Doodle Duel**: take turns drawing a secret word on your phone. It appears live on the TV and everyone races to guess.
+- **Who Dunnit?** (4+ players): everyone answers a question, but one secret impostor got a different one. Argue, then vote out the faker.
+
+The host can **pause** (button, P or Space) and go **full screen** (button or F) at any time.
+
 **Two decks:** the default **Spicy 18+** deck has 120 Cards Against Humanity-style prompts about sex, booze, bodily functions, bad dates and dark stuff, with no punching at groups of people. The **Family** deck has 58 clean but still unhinged prompts for when parents or kids are around. Switch between them in the lobby. Spicy rooms also mix in some family prompts for variety.
 
 ---

@@ -5,6 +5,7 @@ import { PlayerApp } from './player/PlayerApp';
 import { Avatar, SvgDefs } from './components/Avatar';
 import { Btn, Logo, SoundControls, Stage } from './components/ui';
 import { createRoom, getSession, useStore } from './net';
+import { GAME_LIST } from '../../shared/types';
 import { startMusic, unlockAudio } from './audio';
 
 export function navigate(path: string) {
@@ -42,12 +43,7 @@ export function App() {
   );
 }
 
-const GAMES = [
-  { id: 'comedy-clash', name: 'Noor’s Whiplash', tag: 'Write terrible answers. Get judged by friends.', players: '3–10 players', time: '~20 min', ready: true, color: 'pink' },
-  { id: 'doodle', name: 'Doodle Duel', tag: 'Drawing & guessing', players: '3–8', ready: false, color: 'cyan' },
-  { id: 'sus', name: 'Who Dunnit?', tag: 'Social deduction', players: '4–10', ready: false, color: 'lime' },
-  { id: 'fib', name: 'Fib Factory', tag: 'Trivia & bluffing', players: '3–8', ready: false, color: 'orange' },
-];
+const GAMES = GAME_LIST.map((g) => ({ ...g, players: `${g.minPlayers}–${g.maxPlayers} players`, ready: true }));
 
 function Landing() {
   const [picking, setPicking] = useState(false);

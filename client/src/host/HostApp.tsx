@@ -2,7 +2,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import QRCode from 'qrcode';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { HostView } from '../../../shared/types';
-import { MAX_PLAYERS, MIN_PLAYERS } from '../../../shared/types';
+import { GAME_LIST, MAX_PLAYERS, gameMeta } from '../../../shared/types';
+import { SCREENS } from '../games/registry';
+import { GameTitle } from '../games/common';
 import { sfx, startMusic, stopMusic, unlockAudio, type MusicTheme } from '../audio';
 import { Avatar, Mascot } from '../components/Avatar';
 import { Btn, Logo, SoundControls, Stage, themeForRound, useAudioPrefs, type Theme } from '../components/ui';
@@ -68,8 +70,10 @@ function useHostAudio(v: HostView) {
     const p = prev.current;
     prev.current = v;
     // Music follows the show.
+    const gameMusic: Record<string, MusicTheme> = { 'fib-factory': 'round3', 'doodle-duel': 'round2', 'who-dunnit': 'round1' };
     const theme: MusicTheme | null =
       v.paused && v.phase !== 'lobby' ? null
+      : v.gameId !== 'comedy-clash' && v.phase !== 'lobby' && v.phase !== 'gameOver' ? (v.phase === 'vote' || v.phase === 'pick' ? 'tense' : gameMusic[v.gameId])
       : v.phase === 'lobby' ? 'menu'
       : v.phase === 'gameOver' ? null
       : v.phase === 'vote' || v.phase === 'finalVote' ? 'tense'
@@ -91,6 +95,8 @@ function useHostAudio(v: HostView) {
       if (v.phase === 'finalResult') setTimeout(() => sfx('score'), 900);
       if (v.phase === 'scoreboard') sfx('score');
       if (v.phase === 'finalVote') sfx('whoosh');
+      if (['question', 'choose', 'pick', 'answer', 'draw'].includes(v.phase)) sfx('whoosh');
+      if (v.phase === 'result') sfx('reveal');
       if (v.phase === 'gameOver') setTimeout(() => sfx('victory'), 1200);
     }
     if ((v.writing?.done.length ?? 0) > (p.writing?.done.length ?? 0)) sfx('submit');
@@ -101,9 +107,12 @@ function useHostAudio(v: HostView) {
 
 function HostScreen({ v }: { v: HostView }) {
   useHostAudio(v);
-  const theme: Theme = v.phase === 'lobby' ? 'menu' : v.phase === 'gameOver' ? 'win' : themeForRound(v.round);
-  const skippable = ['intro', 'roundIntro', 'reveal', 'matchupResult', 'scoreboard', 'finalIntro', 'finalResult'].includes(v.phase);
-  const key = v.phase === 'reveal' || v.phase === 'vote' || v.phase === 'matchupResult' ? `m-${v.round}-${v.matchup?.index}` : v.phase === 'finalVote' || v.phase === 'finalResult' ? 'finalboard' : `${v.phase}-${v.round}`;
+  const G = v.gameId === 'comedy-clash' ? null : SCREENS[v.gameId];
+  const theme: Theme = v.phase === 'lobby' ? 'menu' : v.phase === 'gameOver' ? 'win' : G ? G.theme : themeForRound(v.round);
+  const skippable = (G ? ['intro', 'question', 'roundIntro', 'reveal', 'result', 'scoreboard'] : ['intro', 'roundIntro', 'reveal', 'matchupResult', 'scoreboard', 'finalIntro', 'finalResult']).includes(v.phase);
+  const key = G
+    ? (v.phase === 'draw' || v.phase === 'reveal') && v.gameId === 'doodle-duel' ? `dd-${v.round}` : (v.phase === 'reveal' || v.phase === 'vote' || v.phase === 'result') && v.gameId === 'who-dunnit' ? `who-${v.round}` : `${v.phase}-${v.round}`
+    : v.phase === 'reveal' || v.phase === 'vote' || v.phase === 'matchupResult' ? `m-${v.round}-${v.matchup?.index}` : v.phase === 'finalVote' || v.phase === 'finalResult' ? 'finalboard' : `${v.phase}-${v.round}`;
   const [menu, setMenu] = useState(false);
   const canPause = v.phase !== 'lobby' && v.phase !== 'gameOver';
   const togglePause = () => canPause && emit('host:pause', { paused: !v.paused });
@@ -151,6 +160,10 @@ function HostScreen({ v }: { v: HostView }) {
       <AnimatePresence mode="wait">
         <motion.div key={key} className="host-phase" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.04, filter: 'blur(6px)' }} transition={{ duration: 0.35 }}>
           {v.phase === 'lobby' && <Lobby v={v} />}
+          {G && v.phase === 'scoreboard' && <Scoreboard v={v} title={G.scoreTitle(v)} />}
+          {G && v.phase === 'gameOver' && <GameOver v={v} />}
+          {G && !['lobby', 'scoreboard', 'gameOver'].includes(v.phase) && <G.Host v={v} />}
+          {!G && <>
           {v.phase === 'intro' && <Intro v={v} />}
           {v.phase === 'roundIntro' && <RoundIntro v={v} />}
           {(v.phase === 'writing' || v.phase === 'finalWriting') && <Writing v={v} />}
@@ -159,6 +172,7 @@ function HostScreen({ v }: { v: HostView }) {
           {v.phase === 'finalIntro' && <FinalIntro v={v} />}
           {(v.phase === 'finalVote' || v.phase === 'finalResult') && <FinalBoard v={v} />}
           {v.phase === 'gameOver' && <GameOver v={v} />}
+          </>}
         </motion.div>
       </AnimatePresence>
       <AnimatePresence>
@@ -200,13 +214,14 @@ function Lobby({ v }: { v: HostView }) {
     QRCode.toDataURL(full, { margin: 1, width: 480, color: { dark: '#1b1035', light: '#ffffff' } }).then(setQr);
   }, [full]);
   const slots = useMemo(() => Array.from({ length: MAX_PLAYERS }, (_, i) => v.players[i] ?? null), [v.players]);
-  const need = Math.max(0, MIN_PLAYERS - v.players.filter((p) => p.connected).length);
+  const need = Math.max(0, v.minPlayers - v.players.filter((p) => p.connected).length);
+  const meta = gameMeta(v.gameId);
 
   return (
     <div className="lobby">
       <div className="lobby-left">
         <div className="lobby-logo">
-          <Logo size={0.42} />
+          {v.gameId === 'comedy-clash' ? <Logo size={0.42} /> : <GameTitle name={meta.name.toUpperCase()} size={0.45} />}
           {v.settings.spicy && <span className="tag-18">18+</span>}
         </div>
         <div className="join-card">
@@ -231,6 +246,14 @@ function Lobby({ v }: { v: HostView }) {
         </div>
       </div>
       <div className="lobby-right">
+        <div className="game-switch">
+          {GAME_LIST.map((g) => (
+            <button key={g.id} className={`gs-pill gs-${g.color} ${g.id === v.gameId ? 'on' : ''}`} onClick={() => emit('host:setGame', { gameId: g.id })}>
+              {g.name}
+            </button>
+          ))}
+        </div>
+        <p className="game-tag">{meta.tag} · {meta.minPlayers}–{meta.maxPlayers} players · {meta.time}</p>
         <div className="lobby-heading">
           <h2>Players</h2>
           <span className="count-badge">{v.players.length} / {MAX_PLAYERS}</span>

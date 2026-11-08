@@ -44,7 +44,8 @@ export function createApp() {
     // Tiny per-socket rate limiter (30 events / 3s) to stop runaway clients.
     let bucket = 0;
     const refill = setInterval(() => (bucket = 0), 3000);
-    socket.use((_packet, next) => (++bucket > 30 ? next(new Error('Slow down')) : next()));
+    // Drawing streams many small packets, so it gets a bigger budget.
+    socket.use((packet, next) => ((bucket += packet[0] === 'draw' ? 0.25 : 1) > 40 ? next(new Error('Slow down')) : next()));
 
     const room = (): Room | undefined => (data.code ? rooms.get(data.code) : undefined);
     const reply = (cb: unknown, ack: Ack<any>) => typeof cb === 'function' && cb(ack);
@@ -87,6 +88,11 @@ export function createApp() {
     socket.on('host:kick', (p: { playerId?: string }, cb) =>
       hostOnly((r) => r.kick(String(p?.playerId)))(p, cb),
     );
+    socket.on('host:setGame', (p: { gameId?: string }, cb) => hostOnly((r) => r.setGame(p?.gameId))(p, cb));
+    socket.on('draw', (p: unknown) => {
+      const r = room();
+      if (r && data.role === 'player' && data.playerId) r.game?.draw?.(data.playerId, p);
+    });
     socket.on('host:settings', (p: Partial<Settings>, cb) => hostOnly((r) => r.updateSettings(p ?? {}))(p, cb));
     socket.on('host:close', hostOnly((r) => { r.close('The host ended this room.'); data.code = undefined; }));
 

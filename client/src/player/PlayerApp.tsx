@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
-import { AVATAR_COUNT, MAX_ANSWER, MAX_NAME, type PeekResult, type PlayerView } from '../../../shared/types';
+import { AVATAR_COUNT, MAX_ANSWER, MAX_NAME, gameMeta, type PeekResult, type PlayerView } from '../../../shared/types';
+import { SCREENS } from '../games/registry';
 import { sfx, unlockAudio, vibrate } from '../audio';
 import { AVATARS, Avatar, Mascot } from '../components/Avatar';
 import { Btn, CountUp, Logo, SoundControls, TimerBar, themeForRound } from '../components/ui';
@@ -140,11 +141,12 @@ function JoinFlow({ initialCode }: { initialCode: string }) {
 
 // ---------------------------------------------------------------- in-game
 function PlayerScreen({ v, connected }: { v: PlayerView; connected: boolean }) {
-  const theme = v.phase === 'lobby' ? 'menu' : v.phase === 'gameOver' ? 'win' : themeForRound(v.round);
-  const timed = ['writing', 'finalWriting', 'vote', 'finalVote'].includes(v.phase);
+  const G = v.gameId === 'comedy-clash' ? null : SCREENS[v.gameId];
+  const theme = v.phase === 'lobby' ? 'menu' : v.phase === 'gameOver' ? 'win' : G ? G.theme : themeForRound(v.round);
+  const timed = ['writing', 'finalWriting', 'vote', 'finalVote', 'lie', 'pick', 'draw', 'answer'].includes(v.phase);
   const prevPhase = useRef(v.phase);
   useEffect(() => {
-    if (prevPhase.current !== v.phase && (v.phase === 'writing' || v.phase === 'finalWriting' || v.phase === 'vote' || v.phase === 'finalVote')) vibrate([30, 40, 30]);
+    if (prevPhase.current !== v.phase && ['writing', 'finalWriting', 'vote', 'finalVote', 'lie', 'pick', 'answer', 'choose', 'draw'].includes(v.phase)) vibrate([30, 40, 30]);
     prevPhase.current = v.phase;
   }, [v.phase]);
 
@@ -174,6 +176,8 @@ function PlayerScreen({ v, connected }: { v: PlayerView; connected: boolean }) {
 }
 
 function PhoneBody({ v }: { v: PlayerView }) {
+  const G = v.gameId === 'comedy-clash' ? null : SCREENS[v.gameId];
+  if (G && !['lobby', 'scoreboard', 'gameOver'].includes(v.phase)) return <G.Phone v={v} />;
   switch (v.phase) {
     case 'lobby':
       return <PhoneLobby v={v} />;
@@ -198,7 +202,7 @@ function PhoneBody({ v }: { v: PlayerView }) {
     case 'matchupResult':
       return <LookUp title="Results on the TV!" sub={`You have ${v.me.score.toLocaleString()} points.`} mood="wink" />;
     case 'scoreboard':
-      return <Standing v={v} label={`Round ${v.round} done!`} />;
+      return <Standing v={v} label={G ? 'Scores are on the TV' : `Round ${v.round} done!`} />;
     case 'finalResult':
       return <Standing v={v} label="Final votes are in!" />;
     case 'gameOver':
@@ -215,14 +219,14 @@ function PhoneLobby({ v }: { v: PlayerView }) {
         <Avatar id={v.me.avatar} size={150} bob mood="happy" />
       </motion.div>
       <Rename name={v.me.name} />
-      <p className="muted">Look for yourself on the TV. {n} player{n === 1 ? '' : 's'} here.</p>
+      <p className="muted">Up next: <b>{gameMeta(v.gameId).name}</b>. {n} player{n === 1 ? '' : 's'} here.</p>
       {v.me.isVip ? (
         <div className="vip-box">
           <span className="vip">VIP</span>
           {v.canStart ? (
             <Btn big onClick={() => emit('game:start')}>Everybody’s in — start!</Btn>
           ) : (
-            <p>You can start the game once {Math.max(0, 3 - n)} more {3 - n === 1 ? 'player joins' : 'players join'}.</p>
+            <p>You can start once {Math.max(0, v.minPlayers - n)} more {v.minPlayers - n === 1 ? 'player joins' : 'players join'}.</p>
           )}
         </div>
       ) : (

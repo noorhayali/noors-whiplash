@@ -33,6 +33,8 @@ export interface Player {
 /** Contract every game module implements. The room owns players/sockets; the game owns phases. */
 export interface GameInstance {
   readonly phase: Phase;
+  /** Optional: live drawing data from a phone (Doodle Duel). */
+  draw?(playerId: string, payload: unknown): void;
   start(): void;
   action(playerId: string, action: PlayerAction): Ack;
   hostSkip(): void;
@@ -250,7 +252,7 @@ export class Room {
     const def = GAMES[this.gameId];
     // Drop anybody who disconnected in the lobby before starting.
     for (const p of [...this.players.values()]) if (!p.connected) this.removePlayer(p.id);
-    if (this.players.size < def.minPlayers) return { ok: false, error: `Need at least ${MIN_PLAYERS} players.` };
+    if (this.players.size < def.minPlayers) return { ok: false, error: `Need at least ${def.minPlayers} players.` };
     for (const p of this.players.values()) p.score = 0;
     this.game?.dispose();
     this.game = def.create(this);
@@ -286,6 +288,24 @@ export class Room {
     else if (this.hostConnected) this.game.resume();
     this.touch();
     return { ok: true };
+  }
+
+  /** Switch which game this room will play (lobby only). */
+  setGame(gameId: unknown): Ack {
+    if (!this.inLobby) return { ok: false, error: 'Finish this game first.' };
+    if (typeof gameId !== 'string' || !(gameId in GAMES)) return { ok: false, error: 'Unknown game.' };
+    this.gameId = gameId as GameId;
+    this.touch();
+    return { ok: true };
+  }
+
+  emitHost(event: string, payload: unknown) {
+    if (this.hostSocketId) this.io.to(this.hostSocketId).emit(event, payload);
+  }
+
+  emitPlayer(playerId: string, event: string, payload: unknown) {
+    const p = this.players.get(playerId);
+    if (p?.socketId) this.io.to(p.socketId).emit(event, payload);
   }
 
   updateSettings(s: Partial<Settings>) {
@@ -328,6 +348,7 @@ export class Room {
       phase: 'lobby',
       round: 0,
       totalRounds: 3,
+      minPlayers: GAMES[this.gameId].minPlayers,
       players: this.publicPlayers(),
       settings: this.settings,
       timer: null,
@@ -349,6 +370,8 @@ export class Room {
     return {
       role: 'player',
       code: this.code,
+      gameId: this.gameId,
+      minPlayers: GAMES[this.gameId].minPlayers,
       phase: 'lobby',
       round: 0,
       totalRounds: 3,

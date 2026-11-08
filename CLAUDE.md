@@ -1,6 +1,6 @@
 # Noor's Whiplash — project guide for Claude Code
 
-Real-time multiplayer party game (Jackbox-style). One screen (TV/laptop) is the host; players join from phone browsers with a room code or QR. 18+ "spicy" deck by default, with a clean "Family" deck toggle.
+Real-time multiplayer party-game platform (Jackbox-style) with four games: **Noor's Whiplash** (comedy writing + voting), **Fib Factory** (bluffing on weird true facts), **Doodle Duel** (draw on your phone, others guess) and **Who Dunnit?** (one secret impostor gets a different question). One screen (TV/laptop) is the host; players join from phone browsers with a room code or QR. 18+ "spicy" deck by default, with a clean "Family" deck toggle.
 
 ## Commands
 - `npm install` — once
@@ -9,11 +9,15 @@ Real-time multiplayer party game (Jackbox-style). One screen (TV/laptop) is the 
 - `npm test` — unit + multiplayer socket tests (~35s). Run after any server change.
 - `npm run typecheck`
 - Browser E2E with screenshots: `npm run build && TIME_SCALE=0.5 PORT=3200 node dist/server.js &` then `BASE_URL=http://localhost:3200 npm run test:e2e` (needs Chrome; set `CHROME_PATH` if needed). Screenshots land in `tests/screenshots/`. Look at them after UI changes.
+- New-games browser E2E: same server, then `BASE_URL=http://localhost:3200 npm run test:e2e:games` (screenshots in `tests/screenshots/games/`).
 
 ## Architecture
 - `shared/types.ts`: every type the server and client share (views, actions, settings).
 - `server/rooms.ts`: room system that works for any game (codes, players, reconnect tokens, host pause/resume, VIP, rename, settings). Games implement `GameInstance`.
 - `server/games/comedyClash/`: this game's engine (state machine), `scoring.ts` (pure rules), `prompts.ts` (SPICY + FAMILY decks, final prompts). The internal id is still `comedy-clash`; the display name is "Noor's Whiplash".
+- `server/games/base.ts`: `BaseGame`, the shared timer/pause/scores/results plumbing the newer games extend. Also has `normalize`/`levenshtein` helpers for typed answers.
+- `server/games/fibFactory/` (facts.ts must contain only TRUE facts), `doodleDuel/` (words.ts; live strokes arrive via the `draw` socket event and are relayed to the TV with `room.emitHost`), `whoDunnit/` (questions.ts holds crew/impostor pairs).
+- `shared/types.ts` `GAME_LIST` holds each game's name, tagline and player counts; `server/games/registry.ts` maps ids to engines; `client/src/games/registry.tsx` maps ids to TV/phone components and stage colour. Non-Whiplash games put their state in `view.data`.
 - `server/index.ts`: Express + Socket.IO events. The server is authoritative for timers, prompts, votes and scores. Never trust the client.
 - `client/src/net.ts`: socket, session resume (localStorage), state store, clock offset.
 - `client/src/host/`: TV screens. `client/src/player/`: phone controller. `client/src/components/`: characters, timers, confetti, logo, UI.

@@ -28,7 +28,7 @@ await tv.screenshot({ path: OUT + '01-landing.png' });
 await tv.getByRole('button', { name: /Play Game/ }).click();
 await tv.waitForTimeout(800);
 await tv.screenshot({ path: OUT + '02-game-select.png' });
-await tv.getByText('Start a room').click();
+await tv.locator('.game-card', { hasText: 'Whiplash' }).click();
 await tv.waitForSelector('.code-tile');
 const code = (await tv.locator('.code-tile').allInnerTexts()).join('');
 log('room', code);
