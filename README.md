@@ -42,7 +42,7 @@ The server keeps **persistent WebSocket connections**, so deploy it to a host th
 2. In Render: **New → Blueprint**, then pick the repo. It reads `render.yaml`. Build: `npm ci && npm run build`. Start: `npm start`. Health check: `/health`.
 3. Once it's live, add an env var `PUBLIC_URL=https://<your-app>.onrender.com` so the TV shows the clean address in the QR code.
 
-> Use a paid "starter" instance (or anything that doesn't sleep). Free instances spin down when idle, which ends any game in progress.
+> The **free** plan works for game nights (the included `render.yaml` uses it). Since Feb 2026, Render keeps free services awake while WebSocket messages are flowing, and the phones and TV ping the server every 10 seconds, so a game in progress keeps it awake. After 15 idle minutes it sleeps. Opening the site wakes it in about a minute, so open the TV page a minute before people join. Render may occasionally restart free services, which would end a game in progress. Upgrade to Starter if that ever becomes annoying.
 
 ### Railway / Fly.io / any Docker host
 A `Dockerfile` is included: `docker build -t comedy-clash . && docker run -p 3000:3000 comedy-clash`.
