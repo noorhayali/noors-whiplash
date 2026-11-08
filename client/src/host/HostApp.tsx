@@ -69,7 +69,8 @@ function useHostAudio(v: HostView) {
     prev.current = v;
     // Music follows the show.
     const theme: MusicTheme | null =
-      v.phase === 'lobby' ? 'menu'
+      v.paused && v.phase !== 'lobby' ? null
+      : v.phase === 'lobby' ? 'menu'
       : v.phase === 'gameOver' ? null
       : v.phase === 'vote' || v.phase === 'finalVote' ? 'tense'
       : v.round >= 4 ? 'final'
@@ -104,6 +105,17 @@ function HostScreen({ v }: { v: HostView }) {
   const skippable = ['intro', 'roundIntro', 'reveal', 'matchupResult', 'scoreboard', 'finalIntro', 'finalResult'].includes(v.phase);
   const key = v.phase === 'reveal' || v.phase === 'vote' || v.phase === 'matchupResult' ? `m-${v.round}-${v.matchup?.index}` : v.phase === 'finalVote' || v.phase === 'finalResult' ? 'finalboard' : `${v.phase}-${v.round}`;
   const [menu, setMenu] = useState(false);
+  const canPause = v.phase !== 'lobby' && v.phase !== 'gameOver';
+  const togglePause = () => canPause && emit('host:pause', { paused: !v.paused });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'SELECT') return;
+      if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+      if (e.key === 'p' || e.key === 'P' || e.key === ' ') (e.preventDefault(), togglePause());
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [v.paused, canPause]);
 
   return (
     <Stage theme={theme} className="host">
@@ -114,12 +126,18 @@ function HostScreen({ v }: { v: HostView }) {
           </div>
         )}
         <div className="topbar-right">
-          {skippable && (
+          {canPause && (
+            <button className="chip-btn" onClick={togglePause} title="Pause (P or Space)">
+              {v.paused ? 'Resume' : 'Pause'}
+            </button>
+          )}
+          {skippable && !v.paused && (
             <button className="chip-btn" onClick={() => emit('host:skip')}>
               Skip
             </button>
           )}
           <SoundControls />
+          <FullscreenButton />
           <button className="icon-btn" aria-label="Room menu" onClick={() => setMenu(!menu)}>☰</button>
         </div>
         {menu && (
@@ -143,7 +161,19 @@ function HostScreen({ v }: { v: HostView }) {
           {v.phase === 'gameOver' && <GameOver v={v} />}
         </motion.div>
       </AnimatePresence>
-      {v.paused && v.phase !== 'lobby' && <div className="paused-banner">Paused</div>}
+      <AnimatePresence>
+        {v.paused && canPause && (
+          <motion.div className="pause-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div className="pause-card" initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}>
+              <Mascot mood="sad" size="calc(var(--u) * 12)" />
+              <h1>Paused</h1>
+              <p>Go refill your drink. Timers are frozen.</p>
+              <Btn big onClick={togglePause}>Resume</Btn>
+              <span className="pause-hint">Press P or Space to pause / resume · F for full screen</span>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Stage>
   );
 }
@@ -237,7 +267,7 @@ function Lobby({ v }: { v: HostView }) {
           <label className="setting">
             Answer time
             <select value={v.settings.writingSeconds} onChange={(e) => emit('host:settings', { writingSeconds: Number(e.target.value) })}>
-              {[45, 60, 90, 120].map((s) => (
+              {[60, 90, 120, 180].map((s) => (
                 <option key={s} value={s}>{s} seconds</option>
               ))}
             </select>
@@ -252,3 +282,29 @@ function Lobby({ v }: { v: HostView }) {
   );
 }
 
+
+export function toggleFullscreen() {
+  const d = document as any;
+  const el = document.documentElement as any;
+  if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen)?.call(d);
+  else (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el, { navigationUI: 'hide' })?.catch?.(() => {});
+}
+
+export function FullscreenButton() {
+  const [fs, setFs] = useState(!!document.fullscreenElement);
+  useEffect(() => {
+    const f = () => setFs(!!(document.fullscreenElement || (document as any).webkitFullscreenElement));
+    document.addEventListener('fullscreenchange', f);
+    document.addEventListener('webkitfullscreenchange', f);
+    return () => (document.removeEventListener('fullscreenchange', f), document.removeEventListener('webkitfullscreenchange', f));
+  }, []);
+  const supported = !!(document.documentElement.requestFullscreen || (document.documentElement as any).webkitRequestFullscreen);
+  if (!supported) return null;
+  return (
+    <button className="icon-btn" aria-label={fs ? 'Exit full screen' : 'Full screen'} title="Full screen (F)" onClick={toggleFullscreen}>
+      <svg viewBox="0 0 24 24" width="55%" height="55%" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        {fs ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
+      </svg>
+    </button>
+  );
+}

@@ -66,8 +66,8 @@ A `Dockerfile` is included: `docker build -t comedy-clash . && docker run -p 300
 | Lobby | Room code, QR, join address, players popping in, Spicy/Family toggle | Join form → "You're in!" (tap your name to rename; VIP gets Start) |
 | Intro | Animated title + rules + scoring | "Eyes on the TV" |
 | Round 1–3 | Round title with ×1 / ×2 / ×3 multiplier | — |
-| Writing (60s default, adjustable 45–120s) | Timer, who's finished | 2 private prompts, big text box |
-| Reveal → Vote (20s) | Two anonymous answers slide in, VS badge, vote progress dots | Two big vote buttons (authors can't vote) |
+| Writing (90s default, adjustable 60–180s) | Timer, who's finished | 2 private prompts, big text box |
+| Reveal → Vote (30s) | Two anonymous answers slide in, VS badge, vote progress dots | Two big vote buttons (authors can't vote) |
 | Result | Vote bars, authors revealed, points count up, CLEAN SWEEP stamp | — |
 | Standings | Animated leaderboard that re-sorts itself | Your rank and points gained |
 | Final Clash | Same prompt for everyone; grid of all answers | Write → vote for any answer except your own |

@@ -23,6 +23,7 @@ Real-time multiplayer party game (Jackbox-style). One screen (TV/laptop) is the 
 ## Design decisions (from Noor; keep these)
 - **Characters (`components/Avatar.tsx`) are final.** Don't redesign them: flat colour, odd shapes, mismatched eyes, stick legs.
 - **The UI should feel light, not cartoony:** flat colour per round, hairline borders (1.5px translucent), soft shadows. No thick black outlines, no hard offset shadows, no emoji in the UI.
+- Host controls: Pause (button, P or Space) freezes all timers server-side; Full screen (button or F).
 - Fonts: Bricolage Grotesque (UI), Unbounded 900, slanted, with a pink/cyan speed trail for the "WHIPLASH" title and "The Final Lash".
 - The host screen scales from `--u` (1% of a 16:9 frame). Size host UI in `calc(var(--u) * N)` so it looks the same on a laptop and a 4K TV.
 - Prompts: the spicy deck is Cards Against Humanity-style (sex, booze, bodily, dark, bad dates). The humour should never punch at groups of people. Append new prompts to the arrays; don't reorder them (IDs depend on position).

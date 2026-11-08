@@ -81,6 +81,7 @@ export function createApp() {
       reply(cb, fn(r) ?? { ok: true });
     };
     socket.on('host:skip', hostOnly((r) => r.game?.hostSkip()));
+    socket.on('host:pause', (p: { paused?: boolean }, cb) => hostOnly((r) => r.setPaused(!!p?.paused))(p, cb));
     socket.on('host:backToLobby', hostOnly((r) => r.backToLobby()));
     socket.on('host:playAgain', hostOnly((r) => r.playAgain()));
     socket.on('host:kick', (p: { playerId?: string }, cb) =>

@@ -427,3 +427,10 @@ h1, h2, h3 { font-family: var(--display); font-weight: 700; letter-spacing: -0.0
 .lobby-logo .tag-18 { position: absolute; right: calc(var(--u) * -3); top: 0; font-size: calc(var(--u) * 2.4); }
 .spicy-note { margin: 0; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .lock-icon { line-height: 0; }
+
+.pause-overlay { position: absolute; inset: 0; z-index: 40; background: rgba(15, 10, 30, 0.55); backdrop-filter: blur(6px); display: grid; place-items: center; }
+.pause-card { background: var(--cream); color: var(--ink); border-radius: calc(var(--u) * 2.4); padding: calc(var(--u) * 3) calc(var(--u) * 5); display: flex; flex-direction: column; align-items: center; gap: calc(var(--u) * 1.2); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35); text-align: center; }
+.pause-card h1 { font-family: 'Unbounded', var(--display); font-weight: 900; font-size: calc(var(--u) * 6); transform: skewX(-10deg); }
+.pause-card p { font-size: calc(var(--u) * 1.8); font-weight: 600; margin: 0; }
+.pause-hint { font-size: calc(var(--u) * 1.2); opacity: 0.6; }
+.phone-banner.paused { background: var(--ink); color: var(--yellow); }

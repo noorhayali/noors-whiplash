@@ -267,6 +267,26 @@ describe('Comedy Clash — full multiplayer game', () => {
     [tv, ...players].forEach((c) => c.close());
   });
 
+  it('host pause button freezes the game and resume continues it', async () => {
+    const { host, players } = await setupRoom(3, [{ answer: false }, { answer: false }, { answer: false }]);
+    expect((await host.emit('host:pause', { paused: true })).ok).toBe(false); // nothing to pause in lobby
+    await host.emit('game:start');
+    await players[0].waitFor((s) => s.phase === 'writing');
+    expect((await host.emit('host:pause', { paused: true })).ok).toBe(true);
+    const p = await players[0].waitFor((s) => s.paused && s.hostConnected);
+    expect(p.phase).toBe('writing');
+    // Even if everyone submits while paused, nothing advances.
+    for (const c of players) {
+      const prompts = c.state!.writing!.prompts;
+      for (const pr of prompts) await c.emit('game:action', { type: 'submit', promptId: pr.id, text: 'paused answer' });
+    }
+    await new Promise((r) => setTimeout(r, 2500)); // longer than the scaled writing timer
+    expect(host.state!.phase).toBe('writing');
+    expect((await host.emit('host:pause', { paused: false })).ok).toBe(true);
+    await host.waitFor((s) => s.phase !== 'writing' && !s.paused, 10000);
+    [host, ...players].forEach((c) => c.close());
+  });
+
   it('supports Play Again without repeating prompts, and Back to Lobby', async () => {
     const { host, players } = await setupRoom(3);
     const seenPrompts: string[][] = [[], []];

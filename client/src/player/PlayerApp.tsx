@@ -160,8 +160,9 @@ function PlayerScreen({ v, connected }: { v: PlayerView; connected: boolean }) {
         <SoundControls compact />
       </header>
       {timed && <TimerBar timer={v.timer} />}
+      {v.paused && v.hostConnected && connected && v.phase !== 'lobby' && <div className="phone-banner paused">Game paused by the host</div>}
       {(!v.hostConnected || !connected) && (
-        <div className="phone-banner">{!connected ? 'Reconnecting…' : 'The TV disconnected — game paused until it’s back.'}</div>
+        <div className="phone-banner">{!connected ? 'Reconnecting…' : 'The TV disconnected. Game paused until it’s back.'}</div>
       )}
       <AnimatePresence mode="wait">
         <motion.main key={`${v.phase}-${v.round}-${v.vote?.prompt ?? ''}`} className="phone-main" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ duration: 0.22 }}>

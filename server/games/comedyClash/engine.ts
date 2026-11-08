@@ -30,11 +30,11 @@ export const DURATIONS = {
   intro: 12,
   roundIntro: 4.5,
   reveal: 4,
-  vote: 20,
+  vote: 30,
   matchupResult: 7,
   scoreboard: 9,
   finalIntro: 6,
-  finalVote: 30,
+  finalVote: 45,
   finalResult: 11,
 };
 
@@ -110,6 +110,7 @@ export class ComedyClashGame implements GameInstance {
 
   resume() {
     this.timer.resume();
+    if (!this.timer.paused) this.checkProgress(); // e.g. everyone finished while paused
     this.room.touch();
   }
 
@@ -123,7 +124,7 @@ export class ComedyClashGame implements GameInstance {
 
   hostSkip() {
     const skippable: Phase[] = ['intro', 'roundIntro', 'reveal', 'matchupResult', 'scoreboard', 'finalIntro', 'finalResult'];
-    if (skippable.includes(this.phase)) this.timer.fireNow();
+    if (!this.timer.paused && skippable.includes(this.phase)) this.timer.fireNow();
   }
 
   // ---------------- regular rounds ----------------
@@ -386,6 +387,7 @@ export class ComedyClashGame implements GameInstance {
 
   /** Advance early when everyone still connected is done. */
   private checkProgress() {
+    if (this.timer.paused) return; // nothing advances while paused
     const connected = this.room.connectedPlayers().map((p) => p.id);
     if (this.phase === 'writing' || this.phase === 'finalWriting') {
       if (connected.length && connected.every((id) => this.writingDone(id))) this.timer.fireNow();

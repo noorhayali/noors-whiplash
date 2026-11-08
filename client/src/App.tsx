@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import { HostApp } from './host/HostApp';
+import { FullscreenButton, HostApp } from './host/HostApp';
 import { PlayerApp } from './player/PlayerApp';
 import { Avatar, SvgDefs } from './components/Avatar';
 import { Btn, Logo, SoundControls, Stage } from './components/ui';
@@ -77,7 +77,10 @@ function Landing() {
     <Stage theme="menu" className="landing">
       <div className="topbar">
         <span className={`conn-dot ${connected ? 'on' : ''}`} title={connected ? 'Connected' : 'Connecting…'} />
-        <SoundControls />
+        <div className="topbar-right">
+          <SoundControls />
+          <FullscreenButton />
+        </div>
       </div>
       <AnimatePresence mode="wait">
         {!picking ? (

@@ -56,8 +56,9 @@ export class Room {
   readonly hostToken = newToken();
   hostSocketId: string | null = null;
   hostConnected = false;
+  manualPause = false;
   players = new Map<string, Player>();
-  settings: Settings = { writingSeconds: 60, spicy: true };
+  settings: Settings = { writingSeconds: 90, spicy: true };
   usedPrompts = new Set<string>();
   game: GameInstance | null = null;
   lastActivity = Date.now();
@@ -130,7 +131,7 @@ export class Room {
     this.hostSocketId = socketId;
     this.hostConnected = true;
     clearTimeout(this.hostGoneTimer);
-    this.game?.resume();
+    if (!this.manualPause) this.game?.resume();
     this.touch();
   }
 
@@ -254,6 +255,7 @@ export class Room {
     this.game?.dispose();
     this.game = def.create(this);
     this.game.start();
+    this.manualPause = false;
     if (!this.hostConnected) this.game.pause();
     this.touch();
     return { ok: true };
@@ -276,9 +278,19 @@ export class Room {
     this.touch();
   }
 
+  /** Host pause button. Freezes every timer; the TV must be connected to un-pause. */
+  setPaused(paused: boolean): Ack {
+    if (!this.game || this.inLobby || this.phase === 'gameOver') return { ok: false, error: 'Nothing to pause.' };
+    this.manualPause = paused;
+    if (paused) this.game.pause();
+    else if (this.hostConnected) this.game.resume();
+    this.touch();
+    return { ok: true };
+  }
+
   updateSettings(s: Partial<Settings>) {
     if (!this.inLobby) return;
-    if (s.writingSeconds && [45, 60, 90, 120].includes(s.writingSeconds)) this.settings.writingSeconds = s.writingSeconds;
+    if (s.writingSeconds && [60, 90, 120, 180].includes(s.writingSeconds)) this.settings.writingSeconds = s.writingSeconds;
     if (typeof s.spicy === 'boolean') this.settings.spicy = s.spicy;
     this.touch();
   }
@@ -319,7 +331,7 @@ export class Room {
       players: this.publicPlayers(),
       settings: this.settings,
       timer: null,
-      paused: !this.hostConnected,
+      paused: !this.hostConnected || this.manualPause,
       canStart: this.canStart(),
       multiplier: 1,
       ...g,
@@ -343,7 +355,7 @@ export class Room {
       me: { ...me, rank: higher + 1 },
       players,
       hostConnected: this.hostConnected,
-      paused: !this.hostConnected,
+      paused: !this.hostConnected || this.manualPause,
       timer: null,
       canStart: me.isVip && this.canStart(),
       multiplier: 1,
