@@ -27,6 +27,7 @@ export interface Player {
   connected: boolean;
   joinedAt: number;
   socketId: string | null;
+  lateJoiner: boolean;
   dropTimer?: NodeJS.Timeout;
 }
 
@@ -35,6 +36,8 @@ export interface GameInstance {
   readonly phase: Phase;
   /** Optional: live drawing data from a phone (Doodle Duel). */
   draw?(playerId: string, payload: unknown): void;
+  /** Optional: someone joined while the game is running (they start on 0 points). */
+  onPlayerJoined?(playerId: string): void;
   start(): void;
   action(playerId: string, action: PlayerAction): Ack;
   hostSkip(): void;
@@ -60,7 +63,7 @@ export class Room {
   hostConnected = false;
   manualPause = false;
   players = new Map<string, Player>();
-  settings: Settings = { writingSeconds: 90, spicy: true };
+  settings: Settings = { writingSeconds: 120, spicy: true };
   usedPrompts = new Set<string>();
   game: GameInstance | null = null;
   lastActivity = Date.now();
@@ -106,6 +109,7 @@ export class Room {
         score: p.score,
         connected: p.connected,
         isVip: p.id === vip,
+        lateJoiner: p.lateJoiner,
       }));
   }
 
@@ -120,7 +124,8 @@ export class Room {
       phase: this.phase,
       playerCount: this.players.size,
       takenAvatars: [...this.players.values()].map((p) => p.avatar),
-      joinable: this.inLobby && this.players.size < MAX_PLAYERS,
+      joinable: this.players.size < MAX_PLAYERS,
+      inProgress: !this.inLobby,
       spicy: this.settings.spicy,
     };
   }
@@ -148,7 +153,6 @@ export class Room {
 
   // ---------- players ----------
   join(socketId: string, rawName: string, rawAvatar: number): Ack<{ playerId: string; token: string }> {
-    if (!this.inLobby) return { ok: false, error: 'That game has already started.' };
     if (this.players.size >= MAX_PLAYERS) return { ok: false, error: `This room is full (max ${MAX_PLAYERS}).` };
     const name = sanitizeName(rawName);
     if (!name) return { ok: false, error: 'Please enter a nickname.' };
@@ -169,8 +173,11 @@ export class Room {
       connected: true,
       joinedAt: Date.now(),
       socketId,
+      lateJoiner: !this.inLobby,
     };
     this.players.set(player.id, player);
+    // Late joiners jump straight into the running game with 0 points.
+    if (!this.inLobby) this.game?.onPlayerJoined?.(player.id);
     this.touch();
     return { ok: true, data: { playerId: player.id, token: player.token } };
   }
@@ -253,7 +260,10 @@ export class Room {
     // Drop anybody who disconnected in the lobby before starting.
     for (const p of [...this.players.values()]) if (!p.connected) this.removePlayer(p.id);
     if (this.players.size < def.minPlayers) return { ok: false, error: `Need at least ${def.minPlayers} players.` };
-    for (const p of this.players.values()) p.score = 0;
+    for (const p of this.players.values()) {
+      p.score = 0;
+      p.lateJoiner = false;
+    }
     this.game?.dispose();
     this.game = def.create(this);
     this.game.start();
@@ -310,7 +320,7 @@ export class Room {
 
   updateSettings(s: Partial<Settings>) {
     if (!this.inLobby) return;
-    if (s.writingSeconds && [60, 90, 120, 180].includes(s.writingSeconds)) this.settings.writingSeconds = s.writingSeconds;
+    if (s.writingSeconds && [60, 90, 120, 180, 240].includes(s.writingSeconds)) this.settings.writingSeconds = s.writingSeconds;
     if (typeof s.spicy === 'boolean') this.settings.spicy = s.spicy;
     this.touch();
   }

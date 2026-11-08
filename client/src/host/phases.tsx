@@ -319,6 +319,68 @@ export function FinalBoard({ v }: { v: HostView }) {
 
 // ---------------------------------------------------------------- game over
 export function GameOver({ v }: { v: HostView }) {
+  const hasHighlights = (v.results?.highlights?.length ?? 0) > 0;
+  const [show, setShow] = useState<'podium' | 'highlights'>('podium');
+  useEffect(() => {
+    if (!hasHighlights) return;
+    const t = setTimeout(() => setShow('highlights'), 10000);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div key={show} style={{ height: '100%' }} initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -60 }} transition={{ duration: 0.35 }}>
+        {show === 'podium' ? <Podium v={v} onHighlights={hasHighlights ? () => setShow('highlights') : undefined} /> : <Highlights v={v} onPodium={() => setShow('podium')} />}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+function EndButtons({ toggle }: { toggle?: { label: string; on: () => void } }) {
+  return (
+    <div className="go-buttons">
+      <Btn big onClick={() => emit('host:playAgain')}>Play Again</Btn>
+      {toggle && <Btn variant="secondary" onClick={toggle.on}>{toggle.label}</Btn>}
+      <Btn variant="secondary" onClick={() => emit('host:backToLobby')}>Game Selection</Btn>
+      <Btn variant="ghost" onClick={() => newRoom()}>New Room</Btn>
+    </div>
+  );
+}
+
+function Highlights({ v, onPodium }: { v: HostView; onPodium: () => void }) {
+  const players = byId(v);
+  const hl = v.results!.highlights;
+  return (
+    <div className="highlights">
+      <motion.h1 className="go-title" initial={{ y: -60, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>Highlights of the night</motion.h1>
+      <div className="hl-grid">
+        {hl.map((h, i) => {
+          const p = h.playerId ? players[h.playerId] : null;
+          return (
+            <motion.div key={h.title} className={`hl-card ${h.quote ? 'quote' : ''} fc-${i % 5}`} initial={{ y: 80, opacity: 0, rotate: i % 2 ? 4 : -4 }} animate={{ y: 0, opacity: 1, rotate: i % 2 ? 1 : -1 }} transition={{ delay: 0.3 + i * 0.35, type: 'spring', stiffness: 180, damping: 15 }}>
+              <span className="hl-title">{h.title}</span>
+              {h.quote && (
+                <div className="hl-quote">
+                  <small>{h.quote.prompt}</small>
+                  <b>“{h.quote.text}”</b>
+                </div>
+              )}
+              <div className="hl-who">
+                {p && <Avatar id={p.avatar} size="calc(var(--u) * 4.4)" mood="happy" />}
+                <div>
+                  {p && <b>{p.name}</b>}
+                  <span>{h.value}</span>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+      <EndButtons toggle={{ label: 'Podium', on: onPodium }} />
+    </div>
+  );
+}
+
+function Podium({ v, onHighlights }: { v: HostView; onHighlights?: () => void }) {
   const r = v.results!;
   const players = byId(v);
   const ranked = r.ranking.map((x) => ({ ...x, p: players[x.id] })).filter((x) => x.p);
@@ -383,11 +445,7 @@ export function GameOver({ v }: { v: HostView }) {
               ))}
             </div>
           )}
-          <div className="go-buttons">
-            <Btn big onClick={() => emit('host:playAgain')}>Play Again</Btn>
-            <Btn variant="secondary" onClick={() => emit('host:backToLobby')}>Game Selection</Btn>
-            <Btn variant="ghost" onClick={() => newRoom()}>New Room</Btn>
-          </div>
+          <EndButtons toggle={onHighlights && { label: 'Highlights', on: onHighlights }} />
         </motion.div>
       )}
       </div>

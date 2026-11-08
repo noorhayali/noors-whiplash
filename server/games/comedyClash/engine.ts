@@ -5,6 +5,7 @@ import {
   type Ack,
   type AnswerView,
   type Award,
+  type Highlight,
   type HostView,
   type Phase,
   type PlayerAction,
@@ -89,6 +90,9 @@ export class ComedyClashGame implements GameInstance {
   private stats = new Map<string, Stats>();
   private results: ResultsView | null = null;
   private disposed = false;
+  /** Every answer that went to a vote, for end-of-game highlights. */
+  private history: { round: number; prompt: string; pid: string; text: string; votes: number; eligible: number; sweep: boolean; lostToSweep: boolean }[] = [];
+  private bestRound: { pid: string; pts: number; round: number } | null = null;
 
   constructor(private room: Room) {}
 
@@ -213,6 +217,7 @@ export class ComedyClashGame implements GameInstance {
       this.mIndex++; // nobody answered: skip silently
     }
     if (this.mIndex >= this.matchups.length) {
+      this.trackBestRound();
       this.go('scoreboard', DURATIONS.scoreboard, () =>
         this.round < REGULAR_ROUNDS ? this.startRound(this.round + 1) : this.startFinal(),
       );
@@ -239,6 +244,10 @@ export class ComedyClashGame implements GameInstance {
     m.points = s.points;
     m.sweep = s.sweep;
     m.forfeit = s.forfeit;
+    if (!s.forfeit)
+      m.authors.forEach((id, i) =>
+        this.history.push({ round: this.round, prompt: m.prompt.text, pid: id, text: m.answers[i]!, votes: counts[i], eligible: m.eligible.length, sweep: s.sweep === i, lostToSweep: s.sweep === 1 - i }),
+      );
     m.authors.forEach((id, i) => {
       this.award(id, s.points[i]);
       const st = this.stat(id);
@@ -276,10 +285,13 @@ export class ComedyClashGame implements GameInstance {
     // Lone answer (everyone else blanked): it wins by default for half the pool.
     f.points =
       f.order.length === 1 ? new Map([[f.order[0], FINAL_POOL / 2]]) : scoreFinal(counts, f.eligible.length);
+    if (f.order.length > 1)
+      for (const id of f.order) this.history.push({ round: FINAL_ROUND, prompt: f.prompt.text, pid: id, text: f.answers.get(id)!, votes: counts.get(id) ?? 0, eligible: f.eligible.length, sweep: false, lostToSweep: false });
     for (const [id, pts] of f.points) {
       this.award(id, pts);
       this.stat(id).votes += counts.get(id) ?? 0;
     }
+    this.trackBestRound();
     this.go('finalResult', DURATIONS.finalResult, () => this.finish());
   }
 
@@ -292,8 +304,36 @@ export class ComedyClashGame implements GameInstance {
       winnerIds,
       winnerTitle: WINNER_TITLES[Math.floor(Math.random() * WINNER_TITLES.length)],
       awards: this.buildAwards(winnerIds),
+      highlights: this.buildHighlights(),
     };
     this.go('gameOver', null);
+  }
+
+  private trackBestRound() {
+    for (const [pid, pts] of Object.entries(this.gains)) if (pts > (this.bestRound?.pts ?? 0)) this.bestRound = { pid, pts, round: this.round };
+  }
+
+  private buildHighlights(): Highlight[] {
+    const here = (id: string) => this.room.players.has(id);
+    const out: Highlight[] = [];
+    const top = (key: 'votes' | 'sweeps' | 'unanswered') => {
+      const s = [...this.stats.entries()].filter(([id, v]) => here(id) && v[key] > 0).sort((a, b) => b[1][key] - a[1][key]);
+      return s.length && (s.length === 1 || s[0][1][key] > s[1][1][key]) ? { id: s[0][0], n: s[0][1][key] } : null;
+    };
+    const funny = top('votes');
+    if (funny) out.push({ title: 'Funniest person here', value: `${funny.n} votes in total`, playerId: funny.id });
+    const sweeps = top('sweeps');
+    if (sweeps) out.push({ title: 'Clean sweep champion', value: `${sweeps.n} clean sweep${sweeps.n === 1 ? '' : 's'}`, playerId: sweeps.id });
+    const share = (h: { votes: number; eligible: number }) => (h.eligible ? h.votes / h.eligible : 0);
+    const best = this.history.filter((h) => here(h.pid) && h.votes > 0).sort((a, b) => share(b) - share(a) || b.votes - a.votes || b.round - a.round)[0];
+    if (best) out.push({ title: 'Line of the night', value: `${Math.round(share(best) * 100)}% of the room voted for it`, playerId: best.pid, quote: { prompt: best.prompt, text: best.text } });
+    if (this.bestRound && here(this.bestRound.pid))
+      out.push({ title: 'Biggest round', value: `+${this.bestRound.pts.toLocaleString()} in ${this.bestRound.round >= FINAL_ROUND ? 'the Final Lash' : `Round ${this.bestRound.round}`}`, playerId: this.bestRound.pid });
+    const brutal = this.history.filter((h) => here(h.pid) && h.lostToSweep && h.eligible >= 2).sort((a, b) => b.eligible - a.eligible)[0];
+    if (brutal) out.push({ title: 'Most brutal loss', value: `0 out of ${brutal.eligible} votes`, playerId: brutal.pid, quote: { prompt: brutal.prompt, text: brutal.text } });
+    const ghost = top('unanswered');
+    if (ghost) out.push({ title: 'The ghost', value: `left ${ghost.n} answer${ghost.n === 1 ? '' : 's'} blank`, playerId: ghost.id });
+    return out;
   }
 
   private buildAwards(winnerIds: string[]): Award[] {

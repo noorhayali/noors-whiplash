@@ -2,7 +2,7 @@
 // secret words and draws it on their phone; strokes stream live to the TV. Everyone
 // else races to guess on their phones. Faster = more points; the artist earns points
 // for every friend who gets it.
-import type { Ack, Award, PlayerAction } from '../../../shared/types.js';
+import type { Ack, Award, Highlight, PlayerAction } from '../../../shared/types.js';
 import { BaseGame, cleanText, levenshtein, normalize } from '../base.js';
 import { round10, shuffle } from '../comedyClash/scoring.js';
 import { ALIASES, FAMILY_WORDS, SPICY_WORDS } from './words.js';
@@ -10,7 +10,7 @@ import { ALIASES, FAMILY_WORDS, SPICY_WORDS } from './words.js';
 export const DOODLE = {
   intro: 10,
   choose: 12,
-  draw: 75,
+  draw: 90,
   reveal: 7,
   scoreboard: 9,
   guessMax: 1000,
@@ -49,7 +49,17 @@ export class DoodleDuelGame extends BaseGame {
   private feedId = 0;
   private lastGuess = new Map<string, number>();
   private drawStart = 0;
-  private stats = { drawn: new Map<string, number>(), quick: new Map<string, number>() };
+  private stats = { drawn: new Map<string, number>(), quick: new Map<string, number>(), wrong: new Map<string, number>() };
+  private fastest: { pid: string; pts: number; word: string } | null = null;
+  private bestDrawing: { pid: string; n: number; word: string } | null = null;
+
+  onPlayerJoined(id: string) {
+    // Late joiners get a turn at the end of the queue.
+    if (this.phase !== 'scoreboard' && this.phase !== 'gameOver') {
+      this.order.push(id);
+      this.totalRounds = this.order.length;
+    }
+  }
 
   protected skippable = ['intro', 'reveal', 'scoreboard'];
 
@@ -126,6 +136,7 @@ export class DoodleDuelGame extends BaseGame {
     if (this.artist && n) {
       this.award(this.artist, DOODLE.artistPerGuess * n);
       this.stats.drawn.set(this.artist, n);
+      if (n > (this.bestDrawing?.n ?? 0)) this.bestDrawing = { pid: this.artist, n, word: this.word };
     }
     this.go('reveal', DOODLE.reveal, () => this.nextTurn());
   }
@@ -138,7 +149,14 @@ export class DoodleDuelGame extends BaseGame {
     if (quick && quick !== best) awards.push({ playerId: quick, title: 'Dirty Mind', blurb: 'Guessed first the most times' });
     const worst = [...this.order].find((id) => this.room.players.has(id) && !this.stats.drawn.get(id) && id !== best);
     if (worst) awards.push({ playerId: worst, title: 'Abstract Expressionist', blurb: 'Nobody had a clue what that was' });
-    this.finish(TITLES, awards);
+    const hl: Highlight[] = [];
+    if (this.bestDrawing) hl.push({ title: 'Masterpiece of the night', value: `${this.bestDrawing.n} got “${this.bestDrawing.word}”`, playerId: this.bestDrawing.pid });
+    if (this.fastest) hl.push({ title: 'Fastest guess', value: `+${this.fastest.pts} on “${this.fastest.word}”`, playerId: this.fastest.pid });
+    const q = BaseGame.leader(this.stats.quick);
+    if (q) hl.push({ title: 'Dirtiest mind', value: `guessed first ${this.stats.quick.get(q)} times`, playerId: q });
+    const w = BaseGame.leader(this.stats.wrong);
+    if (w) hl.push({ title: 'Most desperate guesser', value: `${this.stats.wrong.get(w)} wrong guesses`, playerId: w });
+    this.finish(TITLES, awards, hl);
   }
 
   // ---------------- drawing ----------------
@@ -202,12 +220,14 @@ export class DoodleDuelGame extends BaseGame {
         const pts = round10(DOODLE.guessMin + (DOODLE.guessMax - DOODLE.guessMin) * frac);
         if (this.correct.size === 0) this.stats.quick.set(pid, (this.stats.quick.get(pid) ?? 0) + 1);
         this.correct.set(pid, pts);
+        if (pts > (this.fastest?.pts ?? 0)) this.fastest = { pid, pts, word: this.word };
         this.award(pid, pts);
         this.pushFeed(pid, null, 'correct');
         this.room.touch();
         this.checkProgress();
         return { ok: true, data: { correct: true, points: pts } };
       }
+      this.stats.wrong.set(pid, (this.stats.wrong.get(pid) ?? 0) + 1);
       const close = targets.some((t) => t.length >= 4 && levenshtein(t, g) <= (t.length > 7 ? 2 : 1));
       this.pushFeed(pid, close ? null : text, close ? 'close' : 'wrong');
       this.room.touch();

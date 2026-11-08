@@ -175,6 +175,7 @@ function HostScreen({ v }: { v: HostView }) {
           </>}
         </motion.div>
       </AnimatePresence>
+      <LateJoinToast v={v} />
       <AnimatePresence>
         {v.paused && canPause && (
           <motion.div className="pause-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -288,9 +289,9 @@ function Lobby({ v }: { v: HostView }) {
             </div>
           </div>
           <label className="setting">
-            Answer time
+            Thinking time
             <select value={v.settings.writingSeconds} onChange={(e) => emit('host:settings', { writingSeconds: Number(e.target.value) })}>
-              {[60, 90, 120, 180].map((s) => (
+              {[60, 90, 120, 180, 240].map((s) => (
                 <option key={s} value={s}>{s} seconds</option>
               ))}
             </select>
@@ -329,5 +330,33 @@ export function FullscreenButton() {
         {fs ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
       </svg>
     </button>
+  );
+}
+
+/** Little "X joined late" pop-up on the TV when someone jumps into a running game. */
+function LateJoinToast({ v }: { v: HostView }) {
+  const seen = useRef<Set<string>>(new Set(v.players.map((p) => p.id)));
+  const [toast, setToast] = useState<{ id: string; name: string; avatar: number } | null>(null);
+  useEffect(() => {
+    for (const p of v.players) {
+      if (seen.current.has(p.id)) continue;
+      seen.current.add(p.id);
+      if (v.phase !== 'lobby') setToast({ id: p.id, name: p.name, avatar: p.avatar });
+    }
+  }, [v.players]);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4500);
+    return () => clearTimeout(t);
+  }, [toast?.id]);
+  return (
+    <AnimatePresence>
+      {toast && (
+        <motion.div key={toast.id} className="late-toast" initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}>
+          <Avatar id={toast.avatar} size="calc(var(--u) * 4)" mood="happy" />
+          {toast.name} jumped in! Starting on 0 points.
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

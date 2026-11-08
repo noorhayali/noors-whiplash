@@ -218,12 +218,40 @@ describe('Doodle Duel', () => {
     expect(reveal.data.strokes[1]).toEqual({ c: 0, w: 0, p: [500, 500] }); // bad colour clamped, junk points dropped
     const end = await host.waitFor((s) => s.phase === 'gameOver', 60000);
     expect(artistsSeen.size).toBe(3);
+    expect(end.results!.highlights.some((h) => h.title === 'Fastest guess')).toBe(true);
     // Live deltas reached the TV, and the guesser's "clear" was ignored.
     expect(host.events.filter((e) => e.ev === 'draw').length).toBeGreaterThanOrEqual(6);
     expect(host.events.some((e) => e.p.t === 'c')).toBe(false);
     // Each player: guessed right on 2 turns (≥300 each) + 2 guessers × 250 as artist.
     for (const p of end.players) expect(p.score).toBeGreaterThanOrEqual(2 * 300 + 500);
     done([host, ...players]);
+  });
+});
+
+describe('late joining (new games)', () => {
+  it('Doodle Duel gives a late joiner their own drawing turn', async () => {
+    const { host, players, code } = await room('doodle-duel', 3);
+    for (const c of players) c.hooks.push((s) => s.phase === 'choose' && s.data.isArtist && c.emit('game:action', { type: 'choose', index: 0 }));
+    await host.emit('game:start');
+    await host.waitFor((s) => s.phase === 'choose' || s.phase === 'draw');
+    const late = new Client<PlayerView>();
+    late.hooks.push((s) => s.phase === 'choose' && s.data.isArtist && late.emit('game:action', { type: 'choose', index: 0 }));
+    expect((await late.emit('player:join', { code, name: 'Late', avatar: 8 })).ok).toBe(true);
+    await host.waitFor((s) => s.totalRounds === 4);
+    await late.waitFor((s) => s.phase === 'draw' && s.data.isArtist, 30000);
+    await host.waitFor((s) => s.phase === 'gameOver', 30000);
+    done([host, late, ...players]);
+  });
+
+  it('Fib Factory lets a late joiner lie and pick in the next question', async () => {
+    const { host, players, code } = await room('fib-factory', 3);
+    await host.emit('game:start');
+    await host.waitFor((s) => s.phase === 'question');
+    const late = new Client<PlayerView>();
+    expect((await late.emit('player:join', { code, name: 'Late', avatar: 8 })).ok).toBe(true);
+    await late.waitFor((s) => s.phase === 'lie');
+    expect((await late.emit('game:action', { type: 'lie', text: 'a late lie' })).ok).toBe(true);
+    done([host, late, ...players]);
   });
 });
 

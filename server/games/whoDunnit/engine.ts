@@ -1,7 +1,7 @@
 // WHO DUNNIT? — everyone answers the same question on their phone… except one secret
 // impostor, who gets a slightly different question (and doesn't know it). The TV shows
 // the crew's question and everyone's answers. Argue out loud, then vote for the faker.
-import type { Ack, Award, PlayerAction } from '../../../shared/types.js';
+import type { Ack, Award, Highlight, PlayerAction } from '../../../shared/types.js';
 import { BaseGame, cleanText } from '../base.js';
 import { shuffle } from '../comedyClash/scoring.js';
 import { PAIRS, type Pair } from './questions.js';
@@ -12,7 +12,7 @@ export const WHO = {
   roundIntro: 4,
   answer: 45,
   reveal: 14,
-  vote: 60,
+  vote: 90,
   result: 9,
   scoreboard: 7,
   correctVote: 1000,
@@ -33,6 +33,15 @@ export class WhoDunnitGame extends BaseGame {
   private stats = { escapes: new Map<string, number>(), detective: new Map<string, number>(), paranoid: new Map<string, number>() };
 
   protected skippable = ['intro', 'roundIntro', 'reveal', 'result', 'scoreboard'];
+  private bestEscape: { pid: string; votes: number; q: string; text: string } | null = null;
+
+  onPlayerJoined(id: string) {
+    // Late joiners can be the impostor in a later round, and add a round if we're short.
+    if (this.phase === 'scoreboard' && this.round >= this.totalRounds) return;
+    if (this.phase === 'gameOver') return;
+    this.impostorOrder.push(id);
+    this.totalRounds = Math.max(this.totalRounds, Math.min(WHO.maxRounds, this.room.players.size));
+  }
 
   start() {
     this.impostorOrder = shuffle([...this.room.players.keys()]);
@@ -52,7 +61,8 @@ export class WhoDunnitGame extends BaseGame {
     this.answers.clear();
     this.votes.clear();
     this.caught = false;
-    this.go('roundIntro', WHO.roundIntro, () => this.go('answer', WHO.answer, () => this.openReveal()));
+    const answerSecs = Math.max(45, Math.round(this.room.settings.writingSeconds * 0.75));
+    this.go('roundIntro', WHO.roundIntro, () => this.go('answer', answerSecs, () => this.openReveal()));
   }
 
   private drawPair(): Pair {
@@ -92,6 +102,7 @@ export class WhoDunnitGame extends BaseGame {
       for (const id of this.room.players.keys()) if (id !== imp) this.award(id, WHO.crewBonus);
     } else {
       this.award(imp, WHO.escape);
+      if (!this.bestEscape || impVotes < this.bestEscape.votes) this.bestEscape = { pid: imp, votes: impVotes, q: this.pair!.crew, text: this.answers.get(imp) ?? '(nothing)' };
       this.stats.escapes.set(imp, (this.stats.escapes.get(imp) ?? 0) + 1);
     }
     this.go('result', WHO.result, () => this.go('scoreboard', WHO.scoreboard, () => this.nextRound()));
@@ -105,7 +116,13 @@ export class WhoDunnitGame extends BaseGame {
     if (det && det !== sly) awards.push({ playerId: det, title: 'Human Polygraph', blurb: 'Caught the impostor most often' });
     const par = BaseGame.leader(this.stats.paranoid);
     if (par) awards.push({ playerId: par, title: 'Trusts No One', blurb: 'Accused the most innocent people' });
-    this.finish(TITLES, awards);
+    const hl: Highlight[] = [];
+    if (this.bestEscape) hl.push({ title: 'Smoothest escape', value: `got away with ${this.bestEscape.votes} vote${this.bestEscape.votes === 1 ? '' : 's'} against them`, playerId: this.bestEscape.pid, quote: { prompt: this.bestEscape.q, text: this.bestEscape.text } });
+    const cnt = (m: Map<string, number>, title: string, f: (n: number) => string) => { const id = BaseGame.leader(m); if (id) hl.push({ title, value: f(m.get(id)!), playerId: id }); };
+    cnt(this.stats.escapes, 'Master of disguise', (n) => `escaped ${n} time${n === 1 ? '' : 's'}`);
+    cnt(this.stats.detective, 'Human polygraph', (n) => `caught the impostor ${n} time${n === 1 ? '' : 's'}`);
+    cnt(this.stats.paranoid, 'Trusts no one', (n) => `accused ${n} innocent ${n === 1 ? 'person' : 'people'}`);
+    this.finish(TITLES, awards, hl);
   }
 
   // ---------------- actions ----------------

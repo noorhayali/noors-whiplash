@@ -1,7 +1,7 @@
 // FIB FACTORY — a weird true fact with a blank appears. Everyone writes a convincing
 // fake answer. Then everyone sees the truth mixed with all the lies and tries to pick
 // the real one. Points for finding the truth, and for every friend your lie fools.
-import type { Ack, Award, PlayerAction } from '../../../shared/types.js';
+import type { Ack, Award, Highlight, PlayerAction } from '../../../shared/types.js';
 import { BaseGame, cleanText, normalize } from '../base.js';
 import { shuffle } from '../comedyClash/scoring.js';
 import { FACTS, type Fact } from './facts.js';
@@ -11,7 +11,7 @@ export const FIB = {
   intro: 10,
   question: 5,
   lie: 60,
-  pick: 30,
+  pick: 40,
   revealPerOption: 2.6,
   revealTail: 5,
   scoreboard: 8,
@@ -40,6 +40,7 @@ export class FibFactoryGame extends BaseGame {
   private options: Option[] = [];
   private picks = new Map<string, string>();
   private eligible: string[] = [];
+  private bestLie: { authors: string[]; text: string; q: string; n: number } | null = null;
   private stats = { fooled: new Map<string, number>(), gullible: new Map<string, number>(), truth: new Map<string, number>() };
 
   totalRounds = FIB.questions;
@@ -58,7 +59,7 @@ export class FibFactoryGame extends BaseGame {
     this.lies.clear();
     this.picks.clear();
     this.options = [];
-    this.go('question', FIB.question, () => this.go('lie', FIB.lie, () => this.openPick()));
+    this.go('question', FIB.question, () => this.go('lie', this.room.settings.writingSeconds, () => this.openPick()));
   }
 
   private drawFact(): Fact {
@@ -115,6 +116,8 @@ export class FibFactoryGame extends BaseGame {
         }
       }
     }
+    for (const o of this.options)
+      if (o.authors.length && o.pickers.length > (this.bestLie?.n ?? 0)) this.bestLie = { authors: o.authors, text: o.text, q: this.fact!.q, n: o.pickers.length };
     // Reveal lies that fooled people first, the truth last. Unpicked lies are skipped.
     const shown = this.options.filter((o) => o.authors.length && o.pickers.length).sort((a, b) => a.pickers.length - b.pickers.length);
     const truth = this.options.find((o) => !o.authors.length)!;
@@ -132,7 +135,16 @@ export class FibFactoryGame extends BaseGame {
     if (sniffer && sniffer !== liar) awards.push({ playerId: sniffer, title: 'Human Lie Detector', blurb: 'Found the truth most often' });
     const sucker = BaseGame.leader(this.stats.gullible);
     if (sucker) awards.push({ playerId: sucker, title: 'Will Believe Anything', blurb: 'Fell for the most lies' });
-    this.finish(TITLES, awards);
+    const hl: Highlight[] = [];
+    if (this.bestLie) hl.push({ title: 'Lie of the night', value: `fooled ${this.bestLie.n} ${this.bestLie.n === 1 ? 'person' : 'people'}`, playerId: this.bestLie.authors[0], quote: { prompt: this.bestLie.q.replace('___', '_____'), text: this.bestLie.text } });
+    const cnt = (m: Map<string, number>) => { const id = BaseGame.leader(m); return id ? { id, n: m.get(id)! } : null; };
+    const l = cnt(this.stats.fooled);
+    if (l) hl.push({ title: 'Master manipulator', value: `fooled friends ${l.n} times`, playerId: l.id });
+    const t = cnt(this.stats.truth);
+    if (t) hl.push({ title: 'Human lie detector', value: `found the truth ${t.n} times`, playerId: t.id });
+    const g = cnt(this.stats.gullible);
+    if (g) hl.push({ title: 'Will believe anything', value: `fell for ${g.n} lies`, playerId: g.id });
+    this.finish(TITLES, awards, hl);
   }
 
   // ---------------- actions ----------------

@@ -168,6 +168,12 @@ describe('Comedy Clash — full multiplayer game', () => {
     const top = Math.max(...end.players.map((p) => p.score));
     for (const w of end.results!.winnerIds) expect(end.players.find((p) => p.id === w)!.score).toBe(top);
     expect(end.results!.winnerTitle.length).toBeGreaterThan(3);
+    // Highlights: the funniest player and a quoted line of the night.
+    const hl = end.results!.highlights;
+    expect(hl.some((h) => h.title === 'Funniest person here')).toBe(true);
+    const line = hl.find((h) => h.title === 'Line of the night')!;
+    expect(line.quote!.text).toContain('says:');
+    expect(end.players.some((p) => p.id === line.playerId)).toBe(true);
 
     // Phones also reach the end with their own rank.
     for (const p of players) {
@@ -343,8 +349,9 @@ describe('Comedy Clash — full multiplayer game', () => {
     const eleventh = new Client();
     expect((await eleventh.emit('player:join', { code, name: 'Late', avatar: 0 })).error).toMatch(/full/i);
     expect((await host.emit('game:start')).ok).toBe(true);
+    // Full room stays full even mid-game.
     const late = new Client();
-    expect((await late.emit('player:join', { code, name: 'Later', avatar: 0 })).error).toMatch(/started/i);
+    expect((await late.emit('player:join', { code, name: 'Later', avatar: 0 })).error).toMatch(/full/i);
     [host, p, dup, eleventh, late, ...extra].forEach((c) => c.close());
   });
 
@@ -374,6 +381,31 @@ describe('Comedy Clash — full multiplayer game', () => {
     expect(ids.size).toBe(7); // 2 per round × 3 + final
     for (const id of ids) expect(id).toMatch(/family/);
     [host, ...players].forEach((c) => c.close());
+  });
+
+  it('lets someone join mid-game with 0 points; they play from the next round', async () => {
+    const { host, players, code } = await setupRoom(3);
+    const totals = scoreRecorder(host);
+    await host.emit('game:start');
+    await host.waitFor((s) => s.phase === 'writing' && s.round === 1);
+    const late = bot();
+    const r = await late.emit('player:join', { code, name: 'Latecomer', avatar: 9 });
+    expect(r.ok, r.error).toBe(true);
+    const me = await late.waitFor((s) => !!s.me);
+    expect(me.me.score).toBe(0);
+    expect(me.me.lateJoiner).toBe(true);
+    expect(me.phase).not.toBe('lobby');
+    // No prompts in the round they joined…
+    if (me.phase === 'writing') expect(me.writing?.prompts ?? []).toHaveLength(0);
+    // …but two prompts next round.
+    const r2 = await late.waitFor((s) => s.phase === 'writing' && s.round === 2, 30000);
+    expect(r2.writing!.prompts).toHaveLength(2);
+    const end = await host.waitFor((s) => s.phase === 'gameOver', 45000);
+    expect(end.players).toHaveLength(4);
+    const { totals: t } = totals();
+    for (const p of end.players) expect(p.score).toBe(t[p.id] ?? 0);
+    expect(end.results!.ranking).toHaveLength(4);
+    [host, late, ...players].forEach((c) => c.close());
   });
 
   it('keeps 10 simultaneous players in sync through a full game', async () => {

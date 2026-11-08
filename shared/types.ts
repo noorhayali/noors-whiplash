@@ -45,7 +45,7 @@ export type Phase =
   | 'gameOver';
 
 export interface Settings {
-  writingSeconds: number; // default 60
+  writingSeconds: number; // time to think/write answers; default 120
   spicy: boolean; // 18+ deck (default) vs family deck
 }
 
@@ -56,6 +56,7 @@ export interface PublicPlayer {
   score: number;
   connected: boolean;
   isVip: boolean;
+  lateJoiner: boolean;
 }
 
 export interface TimerView {
@@ -97,11 +98,20 @@ export interface Award {
   playerId: string;
 }
 
+/** A stat or moment shown on the end-of-game highlights screen. */
+export interface Highlight {
+  title: string;
+  value: string;
+  playerId?: string;
+  quote?: { prompt: string; text: string };
+}
+
 export interface ResultsView {
   ranking: { id: string; rank: number; score: number }[];
   winnerIds: string[];
   winnerTitle: string;
   awards: Award[];
+  highlights: Highlight[];
 }
 
 export interface HostView {
@@ -189,5 +199,6 @@ export interface PeekResult {
   playerCount: number;
   takenAvatars: number[];
   joinable: boolean;
+  inProgress: boolean;
   spicy: boolean;
 }

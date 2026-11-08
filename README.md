@@ -10,7 +10,7 @@ Noor’s Whiplash is the first game on the platform. Players write answers to fi
 - **Doodle Duel**: take turns drawing a secret word on your phone. It appears live on the TV and everyone races to guess.
 - **Who Dunnit?** (4+ players): everyone answers a question, but one secret impostor got a different one. Argue, then vote out the faker.
 
-The host can **pause** (button, P or Space) and go **full screen** (button or F) at any time.
+The host can **pause** (button, P or Space) and go **full screen** (button or F) at any time. **Late joiners** can scan the QR mid-game: they start on 0 points and play from the next round. Every game ends with a **Highlights of the night** screen (funniest player, clean-sweep champion, line of the night, biggest round, best lie, smoothest escape…).
 
 **Two decks:** the default **Spicy 18+** deck has 120 Cards Against Humanity-style prompts about sex, booze, bodily functions, bad dates and dark stuff, with no punching at groups of people. The **Family** deck has 58 clean but still unhinged prompts for when parents or kids are around. Switch between them in the lobby. Spicy rooms also mix in some family prompts for variety.
 
@@ -74,7 +74,7 @@ A `Dockerfile` is included: `docker build -t comedy-clash . && docker run -p 300
 | Lobby | Room code, QR, join address, players popping in, Spicy/Family toggle | Join form → "You're in!" (tap your name to rename; VIP gets Start) |
 | Intro | Animated title + rules + scoring | "Eyes on the TV" |
 | Round 1–3 | Round title with ×1 / ×2 / ×3 multiplier | — |
-| Writing (90s default, adjustable 60–180s) | Timer, who's finished | 2 private prompts, big text box |
+| Writing ("Thinking time": 120s default, adjustable 60–240s) | Timer, who's finished | 2 private prompts, big text box |
 | Reveal → Vote (30s) | Two anonymous answers slide in, VS badge, vote progress dots | Two big vote buttons (authors can't vote) |
 | Result | Vote bars, authors revealed, points count up, CLEAN SWEEP stamp | — |
 | Standings | Animated leaderboard that re-sorts itself | Your rank and points gained |

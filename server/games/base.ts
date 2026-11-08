@@ -1,6 +1,6 @@
 // Shared plumbing for games: phase timer, pause/resume, score snapshots, final results.
 // A new game extends BaseGame and implements start(), action(), hostData(), playerData().
-import type { Ack, Award, HostView, Phase, PlayerAction, PlayerView, ResultsView } from '../../shared/types.js';
+import type { Ack, Award, Highlight, HostView, Phase, PlayerAction, PlayerView, ResultsView } from '../../shared/types.js';
 import type { GameInstance, Room } from '../rooms.js';
 import { PhaseTimer } from '../timer.js';
 import { rank } from './comedyClash/scoring.js';
@@ -85,7 +85,7 @@ export abstract class BaseGame implements GameInstance {
     this.gains[id] = (this.gains[id] ?? 0) + pts;
   }
 
-  protected finish(titles: string[], awards: Award[]) {
+  protected finish(titles: string[], awards: Award[], highlights: Highlight[] = []) {
     const players = [...this.room.players.values()];
     const ranking = rank(players.map((p) => ({ id: p.id, score: p.score })));
     const winnerIds = ranking.filter((r) => r.rank === 1).map((r) => r.id);
@@ -94,6 +94,7 @@ export abstract class BaseGame implements GameInstance {
       winnerIds,
       winnerTitle: titles[Math.floor(Math.random() * titles.length)],
       awards: awards.filter((a) => this.room.players.has(a.playerId)).slice(0, 3),
+      highlights: highlights.filter((h) => !h.playerId || this.room.players.has(h.playerId)).slice(0, 6),
     };
     this.go('gameOver', null);
   }

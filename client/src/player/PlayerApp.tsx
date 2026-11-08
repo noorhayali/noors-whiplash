@@ -56,7 +56,7 @@ function JoinFlow({ initialCode }: { initialCode: string }) {
     emit<PeekResult>('room:peek', { code }).then((ack) => {
       if (!ack.ok) return setError(ack.error ?? 'Room not found.');
       const p = ack.data!;
-      if (!p.joinable) return setError(p.phase !== 'lobby' ? 'That game already started — ask the host to start a new one.' : 'That room is full.');
+      if (!p.joinable) return setError('That room is full.');
       setPeek(p);
       if (p.takenAvatars.includes(avatar)) {
         const free = [...Array(AVATAR_COUNT).keys()].find((a) => !p.takenAvatars.includes(a));
@@ -101,6 +101,7 @@ function JoinFlow({ initialCode }: { initialCode: string }) {
       <AnimatePresence>
         {peek && (
           <motion.div className="join-details" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}>
+            {peek.inProgress && <p className="spicy-note">A game is already going. Jump in now: you start on 0 points and play from the next round.</p>}
             {peek.spicy && <p className="spicy-note"><span className="tag-18">18+</span> This room is using the spicy deck.</p>}
             <label className="field">
               <span>Nickname</span>
@@ -256,6 +257,14 @@ function WritePanel({ v }: { v: PlayerView }) {
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
 
+  if (!current && prompts.length === 0)
+    return (
+      <div className="phone-center">
+        <Avatar id={v.me.avatar} size={110} mood="wink" bob />
+        <h1>You made it!</h1>
+        <p className="lookup-sub">This round’s prompts were already handed out. You’ll get yours next round, and you can still vote.</p>
+      </div>
+    );
   if (!current)
     return (
       <div className="phone-center">
@@ -403,6 +412,16 @@ function PhoneGameOver({ v }: { v: PlayerView }) {
         </p>
       )}
       <p className="lookup-sub">{v.me.score.toLocaleString()} points</p>
+      {(r?.highlights ?? []).some((h) => h.playerId === v.me.id) && (
+        <div className="my-highlights">
+          {r!.highlights.filter((h) => h.playerId === v.me.id).map((h) => (
+            <div key={h.title} className="my-hl">
+              <b>{h.title}</b>
+              <small>{h.quote ? `“${h.quote.text}” · ` : ''}{h.value}</small>
+            </div>
+          ))}
+        </div>
+      )}
       {v.me.isVip ? (
         <Btn big onClick={() => emit('game:playAgain')}>Play again</Btn>
       ) : (
